@@ -1,3 +1,4 @@
+from email.utils import formataddr
 import tkinter as tk
 from tkinter import messagebox, Toplevel, Checkbutton, IntVar, StringVar
 import random
@@ -6,10 +7,10 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import json
 
-class InvisibleMateApp:
+class SecretSantaApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("InvisibleMate")
+        self.root.title("SecretSanta")
         
         # Lista de participantes y diccionario de blacklists
         self.participants = []
@@ -167,13 +168,13 @@ class InvisibleMateApp:
             "participants": self.participants,
             "blacklists": self.blacklists
         }
-        with open("invisiblemate_data.json", "w") as f:
+        with open("secretsanta_data.json", "w") as f:
             json.dump(data, f)
-        messagebox.showinfo("Guardar Lista", "Lista guardada en 'invisiblemate_data.json'.")
+        messagebox.showinfo("Guardar Lista", "Lista guardada en 'secretsanta_data.json'.")
     
     def load_list(self):
         try:
-            with open("invisiblemate_data.json", "r") as f:
+            with open("secretsanta_data.json", "r") as f:
                 data = json.load(f)
             self.participants = data["participants"]
             self.blacklists = data["blacklists"]
@@ -199,6 +200,8 @@ class InvisibleMateApp:
         if resultado:
             for giver, receiver in resultado.items():
                 self.enviar_correo(giver, receiver)
+
+
             messagebox.showinfo("Sorteo Privado", "Correos enviados con los resultados.")
     
     def generar_sorteo(self):
@@ -223,32 +226,38 @@ class InvisibleMateApp:
         if receiver in self.blacklists[giver]:
             return False
         return True
-    
+        
     def enviar_correo(self, giver, receiver):
         _, giver_email = next((n, e) for n, e in self.participants if n == giver)
         
         # Configuración del correo
+        remitente = 'name@example.com'  # Cambia a tu dirección de correo en Mail-in-a-Box
+        nombre_remitente = 'Secret Santa 🎅'
+        remitente_formateado = formataddr((nombre_remitente, remitente))
+        remitente_contraseña = 'Password'  # Cambia a la contraseña del remitente
+        servidor_smtp = 'mail.example.com'  # Cambia al dominio de tu servidor
+        puerto_smtp = 465  # Puerto seguro para STARTTLS
+        
         msg = MIMEMultipart()
-        msg['From'] = 'tu_email@example.com'  # Cambiar a tu correo
+        msg['From'] = remitente_formateado
         msg['To'] = giver_email
-        msg['Subject'] = 'Resultado de Amigo Invisible'
+        msg['Subject'] = 'Resultado de Amigo Invisible 🤫'
         msg.attach(MIMEText(f"Hola {giver}, te ha tocado regalar a {receiver}. ¡Feliz Amigo Invisible!"))
         
+
         # Envío del correo
         try:
-            with smtplib.SMTP('smtp.example.com', 587) as server:  # Configura tu servidor SMTP
-                server.starttls()
-                server.login('tu_email@example.com', 'tu_contraseña')  # Cambiar a tu usuario y contraseña
+            with smtplib.SMTP_SSL(servidor_smtp, puerto_smtp) as server:
+                server.login(remitente, remitente_contraseña)  # Autenticación
                 server.send_message(msg)
+                messagebox.showinfo("Correo Enviado", f"Correo enviado a {giver}.")
         except Exception as e:
             messagebox.showerror("Error", f"No se pudo enviar el correo a {giver}. Error: {str(e)}")
-    
-    # Otras funciones para guardar, cargar, sortear, etc.
-    # ... (No se han modificado) ...
+
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app = InvisibleMateApp(root)
+    app = SecretSantaApp(root)
     root.mainloop()
 
 
