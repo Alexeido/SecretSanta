@@ -7,6 +7,8 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import json
+import os
+from datetime import datetime  # CAMBIO: para fecha actual
 
 class SecretSantaApp:
     def __init__(self, root):
@@ -14,15 +16,16 @@ class SecretSantaApp:
         self.root.title("SecretSanta 🎅")
         
         # Lista de participantes y diccionario de blacklists
-        self.participants = []
+        self.participants = []  # [(name, email, note)]
         self.blacklists = {}
         
         # Variables para edición de participantes
         self.selected_participant = None
         self.edit_name_var = StringVar()
         self.edit_email_var = StringVar()
+        self.edit_note_var = StringVar()
         
-        # Estilo de Windows 11
+        # Estilo
         style = ttk.Style()
         style.theme_use('clam')
         style.configure('TButton', font=('Segoe UI', 10), padding=10)
@@ -37,16 +40,21 @@ class SecretSantaApp:
         frame_entry = ttk.Frame(self.root)
         frame_entry.pack(pady=10)
         
-        ttk.Label(frame_entry, text="Nombre:").grid(row=0, column=0)
+        ttk.Label(frame_entry, text="Nombre:").grid(row=0, column=0, sticky='w', padx=5)
         self.name_entry = ttk.Entry(frame_entry)
-        self.name_entry.grid(row=0, column=1)
-        
-        ttk.Label(frame_entry, text="Correo:").grid(row=1, column=0)
+        self.name_entry.grid(row=0, column=1, pady=5)
+
+        ttk.Label(frame_entry, text="Correo:").grid(row=1, column=0, sticky='w', padx=5)
         self.email_entry = ttk.Entry(frame_entry)
-        self.email_entry.grid(row=1, column=1)
+        self.email_entry.grid(row=1, column=1, pady=5)
+
+        # CAMBIO: Campo para la nota
+        ttk.Label(frame_entry, text="Nota:").grid(row=2, column=0, sticky='w', padx=5)
+        self.note_entry = ttk.Entry(frame_entry)
+        self.note_entry.grid(row=2, column=1, pady=5)
         
         add_button = ttk.Button(frame_entry, text="Agregar ➕", command=self.add_participant)
-        add_button.grid(row=2, columnspan=2, pady=5)
+        add_button.grid(row=3, columnspan=2, pady=5)
         
         # Lista de participantes
         self.participant_listbox = tk.Listbox(self.root, selectmode=tk.SINGLE, font=('Segoe UI', 10))
@@ -54,7 +62,7 @@ class SecretSantaApp:
         self.participant_listbox.bind("<Button-3>", self.show_blacklist_section)
         self.participant_listbox.bind("<Button-1>", self.show_edit_section)
         
-        # Sección dinámica para blacklist y edición
+        # Sección dinámica
         self.dynamic_section = ttk.Frame(self.root)
         self.dynamic_section.pack(padx=10, pady=10)
         
@@ -70,41 +78,39 @@ class SecretSantaApp:
     def add_participant(self):
         name = self.name_entry.get().strip()
         email = self.email_entry.get().strip()
+        note = self.note_entry.get().strip()
         
         if not name or not email:
-            messagebox.showwarning("Advertencia ⚠️", "Por favor, ingrese ambos campos.")
+            messagebox.showwarning("Advertencia ⚠️", "Por favor, ingrese nombre y correo.")
             return
         
-        self.participants.append((name, email))
+        self.participants.append((name, email, note))
         self.blacklists[name] = []
         
         self.participant_listbox.insert(tk.END, name)
         self.name_entry.delete(0, tk.END)
         self.email_entry.delete(0, tk.END)
+        self.note_entry.delete(0, tk.END)
     
     def show_blacklist_section(self, event):
-        # Obtiene el nombre seleccionado
         selected_index = self.participant_listbox.curselection()
         if not selected_index:
             return
         
         selected_name = self.participant_listbox.get(selected_index)
         
-        # Limpia la sección dinámica y crea los checkboxes de blacklist
         for widget in self.dynamic_section.winfo_children():
             widget.destroy()
         
         ttk.Label(self.dynamic_section, text=f"Blacklist para {selected_name}").pack(anchor="w")
         check_vars = {}
         
-        # Crear un checkbox para cada participante excepto el propio
-        for name, _ in self.participants:
+        for name, _, _nt in self.participants:
             if name != selected_name:
                 var = IntVar(value=1 if name in self.blacklists[selected_name] else 0)
                 check_vars[name] = var
                 Checkbutton(self.dynamic_section, text=name, variable=var, font=('Segoe UI', 10)).pack(anchor='w')
         
-        # Botón para guardar la blacklist actualizada
         def save_blacklist():
             self.blacklists[selected_name] = [name for name, var in check_vars.items() if var.get() == 1]
             messagebox.showinfo("Blacklist", f"Blacklist actualizada para {selected_name}.")
@@ -112,19 +118,17 @@ class SecretSantaApp:
         ttk.Button(self.dynamic_section, text="Guardar Blacklist 💾", command=save_blacklist).pack(pady=5)
     
     def show_edit_section(self, event):
-        # Obtiene el nombre seleccionado
         selected_index = self.participant_listbox.curselection()
         if not selected_index:
             return
         
         self.selected_participant = self.participant_listbox.get(selected_index)
         
-        # Carga los datos del participante seleccionado en la sección de edición
-        name, email = next((n, e) for n, e in self.participants if n == self.selected_participant)
+        name, email, note = next((n, e, nt) for n, e, nt in self.participants if n == self.selected_participant)
         self.edit_name_var.set(name)
         self.edit_email_var.set(email)
+        self.edit_note_var.set(note)
         
-        # Limpia la sección dinámica y crea los campos de edición
         for widget in self.dynamic_section.winfo_children():
             widget.destroy()
         
@@ -135,32 +139,33 @@ class SecretSantaApp:
         
         ttk.Label(self.dynamic_section, text="Correo:").pack(anchor="w")
         ttk.Entry(self.dynamic_section, textvariable=self.edit_email_var).pack(anchor="w")
+
+        ttk.Label(self.dynamic_section, text="Nota:").pack(anchor="w")
+        ttk.Entry(self.dynamic_section, textvariable=self.edit_note_var).pack(anchor="w")
         
-        # Botones para guardar cambios o eliminar participante
         ttk.Button(self.dynamic_section, text="Guardar Cambios 💾", command=self.save_edits).pack(pady=5)
         ttk.Button(self.dynamic_section, text="Eliminar Participante ❌", command=self.delete_participant).pack(pady=5)
     
     def save_edits(self):
         new_name = self.edit_name_var.get().strip()
         new_email = self.edit_email_var.get().strip()
+        new_note = self.edit_note_var.get().strip()
         
         if not new_name or not new_email:
-            messagebox.showwarning("Advertencia ⚠️", "Por favor, ingrese ambos campos.")
+            messagebox.showwarning("Advertencia ⚠️", "Por favor, ingrese nombre y correo.")
             return
         
-        # Actualiza el participante en la lista y en la interfaz
-        for i, (name, email) in enumerate(self.participants):
+        for i, (name, email, note) in enumerate(self.participants):
             if name == self.selected_participant:
-                self.participants[i] = (new_name, new_email)
-                self.blacklists[new_name] = self.blacklists.pop(name)  # Actualiza el nombre en la blacklist
+                self.participants[i] = (new_name, new_email, new_note)
+                self.blacklists[new_name] = self.blacklists.pop(name)
                 break
         
         self.refresh_participant_listbox()
         messagebox.showinfo("Edición", "Datos actualizados correctamente.")
     
     def delete_participant(self):
-        # Elimina al participante seleccionado
-        self.participants = [(n, e) for n, e in self.participants if n != self.selected_participant]
+        self.participants = [(n, e, nt) for n, e, nt in self.participants if n != self.selected_participant]
         self.blacklists.pop(self.selected_participant, None)
         
         self.refresh_participant_listbox()
@@ -168,7 +173,7 @@ class SecretSantaApp:
     
     def refresh_participant_listbox(self):
         self.participant_listbox.delete(0, tk.END)
-        for name, _ in self.participants:
+        for name, _, _nt in self.participants:
             self.participant_listbox.insert(tk.END, name)
     
     def save_list(self):
@@ -188,7 +193,7 @@ class SecretSantaApp:
             self.blacklists = data["blacklists"]
             
             self.participant_listbox.delete(0, tk.END)
-            for name, _ in self.participants:
+            for name, _, _ in self.participants:
                 self.participant_listbox.insert(tk.END, name)
             
             messagebox.showinfo("Cargar Lista", "Lista cargada correctamente.")
@@ -206,20 +211,38 @@ class SecretSantaApp:
     def sortear_privado(self):
         resultado = self.generar_sorteo()
         if resultado:
+            # CAMBIO: Crear carpeta con la fecha actual
+            fecha_actual = datetime.now().strftime("%Y-%m-%d")
+            if not os.path.exists(fecha_actual):
+                os.makedirs(fecha_actual)
+            
+            # Por cada participante, enviamos el correo y generamos su archivo txt individual
             for giver, receiver in resultado.items():
-                self.enviar_correo(giver, receiver)
-
-            messagebox.showinfo("Sorteo Privado", "Correos enviados con los resultados.")
+                success = self.enviar_correo(giver, receiver)
+                
+                # CAMBIO: Crear un .txt con el mensaje que se le envió (o se intentó enviar)
+                giver_file_path = os.path.join(fecha_actual, f"{giver}.txt")
+                
+                # Obtenemos el contenido del mensaje que se envió
+                contenido = self.contenido_mensaje(giver, receiver)
+                with open(giver_file_path, "w", encoding="utf-8") as gf:
+                    gf.write(contenido + "\n")
+                    if success:
+                        gf.write("Estado del envío: ENVIADO CON ÉXITO")
+                    else:
+                        gf.write("Estado del envío: FALLO AL ENVIAR")
+            
+            messagebox.showinfo("Sorteo Privado", f"Correos enviados con los resultados.\nSe han generado archivos individuales por persona en la carpeta {fecha_actual}.")
     
     def generar_sorteo(self):
         if len(self.participants) < 2:
             messagebox.showerror("Error", "Debe haber al menos 2 participantes.")
             return None
         
-        names = [n for n, _ in self.participants]
+        names = [n for n, _, _ in self.participants]
         shuffled = names[:]
         
-        for _ in range(100):  # Intenta generar combinaciones
+        for _ in range(100):
             random.shuffle(shuffled)
             if all(self.validar_sorteo(n, s) for n, s in zip(names, shuffled)):
                 return dict(zip(names, shuffled))
@@ -233,32 +256,56 @@ class SecretSantaApp:
         if receiver in self.blacklists[giver]:
             return False
         return True
+    
+    def contenido_mensaje(self, giver, receiver):
+        # CAMBIO: función auxiliar para obtener el contenido del mensaje
+        giver_email = ""
+        receiver_note = ""
+        
+        for n, e, nt in self.participants:
+            if n == giver:
+                giver_email = e
+            if n == receiver:
+                receiver_note = nt
+        
+        if receiver_note:
+            contenido = f"Hola {giver}, te ha tocado regalar a {receiver}. Su nota indica: {receiver_note}\n¡Feliz Amigo Invisible!"
+        else:
+            contenido = f"Hola {giver}, te ha tocado regalar a {receiver}. ¡Feliz Amigo Invisible!"
+        
+        return contenido
         
     def enviar_correo(self, giver, receiver):
-        _, giver_email = next((n, e) for n, e in self.participants if n == giver)
+        giver_email = ""
+        
+        for n, e, nt in self.participants:
+            if n == giver:
+                giver_email = e
         
         # Configuración del correo
-        remitente = 'name@example.com'  # Cambia a tu dirección de correo en Mail-in-a-Box
+        remitente = 'name@example.com'  # Cambiar a tu dirección de correo
         nombre_remitente = 'Secret Santa 🎅'
         remitente_formateado = formataddr((nombre_remitente, remitente))
-        remitente_contraseña = 'Password'  # Cambia a la contraseña del remitente
-        servidor_smtp = 'mail.example.com'  # Cambia al dominio de tu servidor
-        puerto_smtp = 465  # Puerto seguro para STARTTLS
+        remitente_contraseña = 'Password'  # Cambiar a la contraseña del remitente
+        servidor_smtp = 'mail.example.com' # Cambiar al servidor SMTP
+        puerto_smtp = 465
+        
+        contenido = self.contenido_mensaje(giver, receiver)
         
         msg = MIMEMultipart()
         msg['From'] = remitente_formateado
         msg['To'] = giver_email
         msg['Subject'] = 'Resultado de Amigo Invisible 🤫'
-        msg.attach(MIMEText(f"Hola {giver}, te ha tocado regalar a {receiver}. ¡Feliz Amigo Invisible!"))
+        msg.attach(MIMEText(contenido))
         
-        # Envío del correo
         try:
             with smtplib.SMTP_SSL(servidor_smtp, puerto_smtp) as server:
-                server.login(remitente, remitente_contraseña)  # Autenticación
+                server.login(remitente, remitente_contraseña)
                 server.send_message(msg)
+            return True
         except Exception as e:
-            messagebox.showerror("Error", f"No se pudo enviar el correo a {giver}. Error: {str(e)}")
-
+            messagebox.showerror("Error", f"No se pudo enviar el correo a {giver} ({giver_email}). Error: {str(e)}")
+            return False
 
 if __name__ == "__main__":
     root = tk.Tk()
